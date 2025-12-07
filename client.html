@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>WebSocket Chat</title>
+  <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+</head>
+<body>
+<h2>WebSocket Chat</h2>
+
+<input id="token" placeholder="JWT Token">
+<input id="msg" placeholder="Введите сообщение">
+<button onclick="connectSocket()">Подключиться</button>
+<button onclick="sendMessage()">Отправить</button>
+
+<ul id="messages"></ul>
+
+<script>
+  let socket;
+
+  function connectSocket() {
+    const token = document.getElementById("token").value;
+    socket = io("http://localhost:3000", { auth: { token } });
+
+    socket.on("connect_error", (err) => alert(err.message));
+
+    socket.on("message", (data) => {
+      const li = document.createElement("li");
+      li.innerText = data;
+      document.getElementById("messages").appendChild(li);
+    });
+  }
+
+  function sendMessage() {
+    const msg = document.getElementById("msg").value;
+    socket.emit("message", msg);
+    document.getElementById("msg").value = "";
+  }
+</script>
+</body>
+</html>
