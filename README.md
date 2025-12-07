@@ -1,61 +1,126 @@
-# Лабораторная работа №5 – WebSockets
+# Лабораторная работа №5. Архитектурные стили и протоколы взаимодействия Web-API (WebSockets)
 
 ## Цель работы
-Реализация WebSocket-сервера для работы в реальном времени и интеграция его с существующим REST API.
 
-## Выбранный стиль
-WebSockets (real-time обмен данными между сервером и клиентом).
+- Освоить альтернативный архитектурный стиль Web-API: WebSockets.
+- Реализовать real-time взаимодействие между клиентом и сервером.
+- Интегрировать новый стиль API с существующим REST API и системой аутентификации.
 
-## Реализованный функционал
-- Сервер WebSocket на Node.js + Express
-- Клиент для чата (HTML + JS)
-- Отправка и получение сообщений в реальном времени
-- Интеграция с REST API для проверки работы сервера
+---
 
-## Структура проекта 
+## Структура проекта
 
-lab5_websockets/
-├── package.json
+```
+lab5-websockets/
 ├── server.js
+├── package.json
 ├── client.html
-├── README.md
 ├── routes/
 │   ├── auth.js
 │   └── todos.js
-├── middlewares/
-│   ├── auth.js
-│   └── errorHandler.js
 ├── models/
 │   ├── user.js
 │   └── todo.js
+├── middlewares/
+│   ├── auth.js
+│   └── errorHandler.js
 └── ws/
     └── socket.js
-
-
-## Запуск проекта
-1. Установить зависимости:
-```bash
-npm install
 ```
-2. Запустить сервер:
-```bash
-npm start
+
+**Описание:**
+
+- `server.js` — основной файл сервера, REST и WebSocket интеграция.
+- `package.json` — зависимости и скрипты запуска.
+- `client.html` — клиент для тестирования WebSocket чата.
+- `routes/` — маршруты REST API (`auth.js`, `todos.js`).
+- `models/` — заглушки для пользователей и задач.
+- `middlewares/` — авторизация JWT (`auth.js`) и глобальный обработчик ошибок (`errorHandler.js`).
+- `ws/socket.js` — middleware для проверки JWT в WebSocket соединениях.
+
+---
+
+## Фрагменты кода
+
+### WebSocket сервер (server.js)
+```javascript
+io.use(authenticateSocket); // проверка JWT при соединении
+io.on("connection", (socket) => {
+  console.log("Пользователь подключился:", socket.user.username);
+
+  socket.on("message", (data) => {
+    io.emit("message", `${socket.user.username}: ${data}`);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Пользователь отключился:", socket.user.username);
+  });
+});
 ```
-3. Открыть client.html в браузере
+
+### WebSocket middleware (ws/socket.js)
+```javascript
+function authenticateSocket(socket, next) {
+  const token = socket.handshake.auth.token;
+  if (!token) return next(new Error("Token missing"));
+
+  jwt.verify(token, secret, (err, user) => {
+    if (err) return next(new Error("Invalid token"));
+    socket.user = users.find(u => u.id === user.id);
+    next();
+  });
+}
+```
+
+### REST API проверка авторизации (middlewares/auth.js)
+```javascript
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) return res.status(401).json({ message: "Token missing" });
+
+  jwt.verify(token, secret, (err, user) => {
+    if (err) return res.status(403).json({ message: "Invalid token" });
+    req.user = user;
+    next();
+  });
+}
+```
+
+---
+
 ## Контрольные вопросы
 
-### Отличие WebSockets от REST:
-REST — модель запрос-ответ, WebSockets — постоянное двустороннее соединение.
+1. **В чём основные отличия REST от WebSockets?**
+   - REST: запрос-ответ, клиент инициирует каждый запрос.
+   - WebSockets: двустороннее соединение, сервер может инициировать сообщения клиенту.
+   - WebSockets позволяют real-time обновления без постоянного опроса REST API.
 
-### Когда WebSockets лучше REST:
+2. **Когда использование WebSockets даёт преимущество?**
+   - Чат-приложения, игровые серверы, коллаборативные редакторы, real-time уведомления.
+   - Улучшение производительности: уменьшается нагрузка от постоянных HTTP-запросов.
+   - Удобство: мгновенная синхронизация данных.
 
-Чаты, уведомления, онлайн-игры, live-обновления данных.
+3. **Ограничения WebSockets:**
+   - Более сложная архитектура для масштабирования.
+   - Необходим постоянный open-сокет, что увеличивает потребление ресурсов.
+   - Поддержка кэширования и REST-подобной инфраструктуры ограничена.
 
-### Недостатки WebSockets:
+4. **Интеграция WebSockets с REST API и JWT:**
+   - WebSockets использует тот же механизм авторизации (JWT), что и REST.
+   - REST API продолжает работать для CRUD операций.
+   - WebSockets добавляет real-time обмен сообщениями поверх существующих моделей пользователей и задач.
 
-Более высокая нагрузка на сервер
+---
 
-Постоянные соединения сложно масштабировать
+## Вывод
 
-### Интеграция с приложением:
-REST используется для CRUD операций, WebSockets — для real-time уведомлений и обмена сообщениями.
+В ходе лабораторной работы №5 была реализована интеграция WebSockets в существующее приложение Node.js с REST API. 
+
+Пользователи могут:
+- Подключаться к серверу с проверкой JWT.
+- Отправлять сообщения, которые мгновенно доставляются всем подключённым клиентам.
+- Продолжать использовать REST API для стандартных операций CRUD.
+
+WebSockets расширили функциональность приложения, обеспечив real-time взаимодействие, улучшив удобство использования и повысив интерактивност
